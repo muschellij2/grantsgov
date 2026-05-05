@@ -68,7 +68,14 @@ grant_search_agencies <- function(query = NULL,
     pagination = pagination
   ))
 
-  grant_post_json("/v1/agencies/search", body, api_key, base_url)
+  response <- grant_post_json("/v1/agencies/search", body, api_key, base_url)
+  grant_add_pagination_call(
+    response,
+    "grant_search_agencies",
+    list(query = query, query_operator = query_operator, filters = filters),
+    pagination,
+    base_url
+  )
 }
 
 #' Search grant opportunities
@@ -112,6 +119,45 @@ grant_search_agencies <- function(query = NULL,
 #'   )
 #'   length(results$data)
 #' }
+#'
+#' # Translation of older Grants.gov-style parameters:
+#' # params = {
+#' #   "keyword": keyword,
+#' #   "sortBy": "closeDate",
+#' #   "sortOrder": "ASC",
+#' #   "rows": limit,
+#' #   "startRecordNum": 0
+#' # }
+#' \dontrun{
+#' keyword <- "education"
+#' limit <- 25
+#' old_style_search <- grant_search_opportunities(
+#'   query = keyword,
+#'   pagination = grant_pagination(
+#'     page_offset = 1, # startRecordNum = 0 means the first page
+#'     page_size = limit, # rows
+#'     sort_order = grant_sort("close_date", "ascending") # closeDate ASC
+#'   )
+#' )
+#' }
+#'
+#' # NIH grants in a subject area, such as cancer.
+#' nih_filters <- list(
+#'   top_level_agency = grant_filter_one_of(list("HHS")),
+#'   opportunity_status = grant_filter_one_of(c("posted", "forecasted"))
+#' )
+#' if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+#'     identical(tolower(Sys.getenv("GRANTSGOV_EXAMPLES_LIVE")), "true")) {
+#'   nih_cancer <- grant_search_opportunities(
+#'     query = "cancer",
+#'     filters = nih_filters,
+#'     pagination = grant_pagination(
+#'       page_size = 25,
+#'       sort_order = grant_sort("close_date", "ascending")
+#'     )
+#'   )
+#'   length(nih_cancer$data)
+#' }
 #' @export
 grant_search_opportunities <- function(query = NULL,
                                        query_operator = c("AND", "OR"),
@@ -135,7 +181,19 @@ grant_search_opportunities <- function(query = NULL,
     format = format
   ))
 
-  grant_post_json("/v1/opportunities/search", body, api_key, base_url)
+  response <- grant_post_json("/v1/opportunities/search", body, api_key, base_url)
+  grant_add_pagination_call(
+    response,
+    "grant_search_opportunities",
+    list(
+      query = query,
+      query_operator = query_operator,
+      filters = filters,
+      format = format
+    ),
+    pagination,
+    base_url
+  )
 }
 
 #' Retrieve opportunity details
@@ -244,7 +302,14 @@ grant_list_extracts <- function(filters = list(),
     pagination = pagination
   ))
 
-  grant_post_json("/v1/extracts", body, api_key, base_url)
+  response <- grant_post_json("/v1/extracts", body, api_key, base_url)
+  grant_add_pagination_call(
+    response,
+    "grant_list_extracts",
+    list(filters = filters),
+    pagination,
+    base_url
+  )
 }
 
 #' Download an extract file
@@ -525,7 +590,14 @@ grant_list_organization_invitations <- function(organization_id,
                                                 api_key = grant_api_key(),
                                                 base_url = grant_base_url()) {
   body <- grant_compact_list(list(filters = grant_non_empty_filters(filters), pagination = pagination))
-  grant_post_json(paste0("/v1/organizations/", organization_id, "/invitations/list"), body, api_key, base_url)
+  response <- grant_post_json(paste0("/v1/organizations/", organization_id, "/invitations/list"), body, api_key, base_url)
+  grant_add_pagination_call(
+    response,
+    "grant_list_organization_invitations",
+    list(organization_id = organization_id, filters = filters),
+    pagination,
+    base_url
+  )
 }
 
 #' List organization legacy users
@@ -554,7 +626,14 @@ grant_list_organization_legacy_users <- function(organization_id,
                                                  api_key = grant_api_key(),
                                                  base_url = grant_base_url()) {
   body <- grant_compact_list(list(filters = grant_non_empty_filters(filters), pagination = pagination))
-  grant_post_json(paste0("/v1/organizations/", organization_id, "/legacy-users"), body, api_key, base_url)
+  response <- grant_post_json(paste0("/v1/organizations/", organization_id, "/legacy-users"), body, api_key, base_url)
+  grant_add_pagination_call(
+    response,
+    "grant_list_organization_legacy_users",
+    list(organization_id = organization_id, filters = filters),
+    pagination,
+    base_url
+  )
 }
 
 #' Ignore a legacy user for an organization
@@ -677,10 +756,17 @@ grant_list_organization_users <- function(organization_id,
                                           pagination = grant_pagination(),
                                           api_key = grant_api_key(),
                                           base_url = grant_base_url()) {
-  grant_post_json(
+  response <- grant_post_json(
     paste0("/v1/organizations/", organization_id, "/users"),
     list(pagination = pagination),
     api_key,
+    base_url
+  )
+  grant_add_pagination_call(
+    response,
+    "grant_list_organization_users",
+    list(organization_id = organization_id),
+    pagination,
     base_url
   )
 }

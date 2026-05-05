@@ -62,4 +62,43 @@ if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
   )
   length(results$data)
 }
+
+# Translation of older Grants.gov-style parameters:
+# params = {
+#   "keyword": keyword,
+#   "sortBy": "closeDate",
+#   "sortOrder": "ASC",
+#   "rows": limit,
+#   "startRecordNum": 0
+# }
+\dontrun{
+keyword <- "education"
+limit <- 25
+old_style_search <- grant_search_opportunities(
+  query = keyword,
+  pagination = grant_pagination(
+    page_offset = 1, # startRecordNum = 0 means the first page
+    page_size = limit, # rows
+    sort_order = grant_sort("close_date", "ascending") # closeDate ASC
+  )
+)
+}
+
+# NIH grants in a subject area, such as cancer.
+nih_filters <- list(
+  top_level_agency = grant_filter_one_of(list("HHS")),
+  opportunity_status = grant_filter_one_of(c("posted", "forecasted"))
+)
+if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+    identical(tolower(Sys.getenv("GRANTSGOV_EXAMPLES_LIVE")), "true")) {
+  nih_cancer <- grant_search_opportunities(
+    query = "cancer",
+    filters = nih_filters,
+    pagination = grant_pagination(
+      page_size = 25,
+      sort_order = grant_sort("close_date", "ascending")
+    )
+  )
+  length(nih_cancer$data)
+}
 }

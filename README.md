@@ -103,9 +103,12 @@ pagination <- grant_pagination(
 str(filters)
 #> List of 4
 #>  $ opportunity_status:List of 1
-#>   ..$ one_of: chr [1:2] "posted" "forecasted"
+#>   ..$ one_of:List of 2
+#>   .. ..$ : chr "posted"
+#>   .. ..$ : chr "forecasted"
 #>  $ applicant_type    :List of 1
-#>   ..$ one_of: chr "nonprofits"
+#>   ..$ one_of:List of 1
+#>   .. ..$ : chr "nonprofits"
 #>  $ close_date        :List of 2
 #>   ..$ start_date: chr "2026-05-05"
 #>   ..$ end_date  : chr "2026-06-04"
@@ -154,8 +157,85 @@ csv_text <- grant_search_opportunities(
 substr(csv_text, 1, 200)
 ```
 
-To collect more than one page, use `grant_paginate()` or the
-endpoint-specific wrapper `grant_search_all_opportunities()`.
+To search for NIH grants in a subject area, use a subject keyword and
+filter to the Department of Health and Human Services top-level agency:
+
+``` r
+nih_cancer <- grant_search_opportunities(
+  query = "cancer",
+  filters = list(
+    top_level_agency = grant_filter_one_of(list("HHS")),
+    opportunity_status = grant_filter_one_of(c("posted", "forecasted"))
+  ),
+  pagination = grant_pagination(
+    page_size = 25,
+    sort_order = grant_sort("close_date", "ascending")
+  )
+)
+
+length(nih_cancer$data)
+```
+
+If you are translating older Grants.gov-style parameters like:
+
+``` r
+params <- list(
+  keyword = keyword,
+  sortBy = "closeDate",
+  sortOrder = "ASC",
+  rows = limit,
+  startRecordNum = 0
+)
+```
+
+use `query`, `grant_sort()`, and `grant_pagination()`:
+
+``` r
+keyword <- "education"
+limit <- 25
+
+results <- grant_search_opportunities(
+  query = keyword,
+  pagination = grant_pagination(
+    page_offset = 1, # startRecordNum = 0
+    page_size = limit, # rows
+    sort_order = grant_sort("close_date", "ascending") # closeDate ASC
+  )
+)
+```
+
+To collect every page after inspecting a first response, pass that
+response to `grant_fetch_all()`. It reuses the original query, filters,
+sort order, and page size.
+
+``` r
+first_page <- grant_search_opportunities(
+  query = "education",
+  filters = filters,
+  pagination = grant_pagination(
+    page_size = 25,
+    sort_order = grant_sort("close_date", "ascending")
+  )
+)
+
+all_results <- grant_fetch_all(first_page)
+
+length(all_results)
+attr(all_results, "pagination_info")
+```
+
+If you want to collect with a larger page size, pass `page_size`.
+Because API page numbers depend on page size, `grant_fetch_all()`
+refetches from page 1 when the requested page size differs from the
+first response.
+
+``` r
+all_results <- grant_fetch_all(first_page, page_size = 5000)
+```
+
+You can also use `grant_paginate()` or the endpoint-specific wrapper
+`grant_search_all_opportunities()` when you prefer to specify the query
+in one call.
 
 ``` r
 all_results <- grant_search_all_opportunities(

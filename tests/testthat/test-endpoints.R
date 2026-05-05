@@ -63,7 +63,7 @@ test_that("agency search posts expected body", {
   expect_equal(captured$method, "POST")
   expect_match(captured$url, "/v1/agencies/search", fixed = TRUE)
   expect_equal(captured$body$data$query, "health")
-  expect_equal(captured$body$data$filters$has_active_opportunity$one_of, TRUE)
+  expect_equal(captured$body$data$filters$has_active_opportunity$one_of, list(TRUE))
 })
 
 test_that("legacy opportunity lookup uses numeric legacy id", {
@@ -248,7 +248,7 @@ test_that("search all opportunities paginates search results", {
   expect_equal(calls[[1]]$query, "education")
   expect_equal(calls[[1]]$query_operator, "AND")
   expect_equal(calls[[1]]$pagination$page_size, 5000L)
-  expect_equal(calls[[1]]$filters$opportunity_status$one_of, "posted")
+  expect_equal(calls[[1]]$filters$opportunity_status$one_of, list("posted"))
 })
 
 test_that("download extract writes bytes and validates inputs", {
@@ -414,8 +414,8 @@ test_that("organization endpoints map methods, paths, and bodies", {
   expect_match(calls[[1]]$url, "/v1/organizations/org-1", fixed = TRUE)
   expect_equal(calls[[2]]$body$data$invitee_email, "a@example.com")
   expect_equal(calls[[2]]$body$data$role_ids, "role-1")
-  expect_equal(calls[[3]]$body$data$filters$status$one_of, "pending")
-  expect_equal(calls[[4]]$body$data$filters$status$one_of, "available")
+  expect_equal(calls[[3]]$body$data$filters$status$one_of, list("pending"))
+  expect_equal(calls[[4]]$body$data$filters$status$one_of, list("available"))
   expect_equal(calls[[5]]$body$data$email, "legacy@example.com")
   expect_match(calls[[6]]$url, "/roles/list", fixed = TRUE)
   expect_equal(calls[[7]]$body$data$opportunity_id, "opp-1")
