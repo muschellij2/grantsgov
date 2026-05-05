@@ -18,7 +18,10 @@ Imports:
     httr2
 Suggests: 
     covr,
+    knitr,
     mockery,
+    pkgload,
+    rmarkdown,
     roxygen2,
     spelling,
     withr,

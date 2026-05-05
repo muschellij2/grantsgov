@@ -1,20 +1,33 @@
+---
+output:
+  github_document:
+    toc: false
+    html_preview: false
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  error = FALSE
+)
+
+run_live_api <- nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+  identical(tolower(Sys.getenv("GRANTSGOV_README_LIVE")), "true")
+```
 
 # grantsgov
 
 <!-- badges: start -->
-
 [![R-CMD-check](https://github.com/muschellij2/grantsgov/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/muschellij2/grantsgov/actions/workflows/R-CMD-check.yaml)
-[![Codecov test
-coverage](https://codecov.io/gh/muschellij2/grantsgov/graph/badge.svg)](https://app.codecov.io/gh/muschellij2/grantsgov)
-[![Lifecycle:
-experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
-[![License:
-MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
+[![Codecov test coverage](https://codecov.io/gh/muschellij2/grantsgov/graph/badge.svg)](https://app.codecov.io/gh/muschellij2/grantsgov)
+[![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 <!-- badges: end -->
 
 `grantsgov` is an R client for the Simpler Grants.gov API at
-<https://api.simpler.grants.gov/docs#/>. It uses `httr2` for requests
-and maps the documented core endpoints:
+<https://api.simpler.grants.gov/docs#/>. It uses `httr2` for requests and maps
+the documented core endpoints:
 
 - `POST /v1/opportunities/search`
 - `GET /v1/opportunities/{opportunity_id}`
@@ -22,20 +35,20 @@ and maps the documented core endpoints:
 
 Set your API key in the `GRANTS_GOV_API_KEY` environment variable:
 
-``` r
+```{r api-key-example, eval = FALSE}
 Sys.setenv(GRANTS_GOV_API_KEY = "your-api-key")
 ```
 
 ## Installation
 
-``` r
+```{r install-example, eval = FALSE}
 # install.packages("pak")
 pak::pak("muschellij2/grantsgov")
 ```
 
 ## Load the package
 
-``` r
+```{r load-package, message = FALSE}
 if (requireNamespace("grantsgov", quietly = TRUE)) {
   library(grantsgov)
 } else {
@@ -45,33 +58,23 @@ if (requireNamespace("grantsgov", quietly = TRUE)) {
 
 ## Inspect endpoint metadata
 
-These examples run without an API key because they only inspect local
-package metadata.
+These examples run without an API key because they only inspect local package
+metadata.
 
-``` r
+```{r endpoint-metadata}
 grantsgov_base_url()
-#> [1] "https://api.simpler.grants.gov"
 names(grantsgov_endpoints()$endpoints)
-#> [1] "search_opportunities" "get_opportunity"      "list_extracts"
 grantsgov_search_options()$sort_by
-#>  [1] "relevancy"             "opportunity_id"        "opportunity_number"   
-#>  [4] "opportunity_title"     "post_date"             "close_date"           
-#>  [7] "agency_code"           "agency_name"           "top_level_agency_name"
-#> [10] "award_floor"           "award_ceiling"
 grantsgov_extract_options()$extract_type
-#> [1] "opportunities_json" "opportunities_csv"
 grantsgov_rate_limit_headers()
-#> [1] "retry-after"           "x-ratelimit-limit"     "x-ratelimit-remaining"
-#> [4] "x-ratelimit-reset"     "ratelimit-limit"       "ratelimit-remaining"  
-#> [7] "ratelimit-reset"
 ```
 
 ## Build request components
 
-The helper constructors create the nested request-body structures used
-by the API.
+The helper constructors create the nested request-body structures used by the
+API.
 
-``` r
+```{r request-components}
 filters <- list(
   opportunity_status = grantsgov_filter_one_of(c("posted", "forecasted")),
   applicant_type = grantsgov_filter_one_of("nonprofits"),
@@ -89,30 +92,7 @@ pagination <- grantsgov_pagination(
 )
 
 str(filters)
-#> List of 4
-#>  $ opportunity_status:List of 1
-#>   ..$ one_of: chr [1:2] "posted" "forecasted"
-#>  $ applicant_type    :List of 1
-#>   ..$ one_of: chr "nonprofits"
-#>  $ close_date        :List of 2
-#>   ..$ start_date: chr "2026-05-05"
-#>   ..$ end_date  : chr "2026-06-04"
-#>  $ award_ceiling     :List of 1
-#>   ..$ max: num 1e+06
 pagination
-#> $page_offset
-#> [1] 1
-#> 
-#> $page_size
-#> [1] 10
-#> 
-#> $sort_order
-#> $sort_order[[1]]
-#> $sort_order[[1]]$order_by
-#> [1] "close_date"
-#> 
-#> $sort_order[[1]]$sort_direction
-#> [1] "ascending"
 ```
 
 ## Search opportunities
@@ -120,7 +100,7 @@ pagination
 This chunk runs when `GRANTS_GOV_API_KEY` is set and
 `GRANTSGOV_README_LIVE=true`.
 
-``` r
+```{r search-opportunities, eval = run_live_api}
 results <- grantsgov_search_opportunities(
   query = "education",
   filters = filters,
@@ -132,7 +112,7 @@ length(results$data)
 
 To request CSV content instead of JSON:
 
-``` r
+```{r search-opportunities-csv, eval = run_live_api}
 csv_text <- grantsgov_search_opportunities(
   filters = list(opportunity_status = grantsgov_filter_one_of("posted")),
   pagination = grantsgov_pagination(page_size = 100),
@@ -146,7 +126,7 @@ substr(csv_text, 1, 200)
 
 This example needs a real opportunity UUID from the API.
 
-``` r
+```{r get-opportunity, eval = FALSE}
 opportunity <- grantsgov_get_opportunity(
   "12345678-1234-1234-1234-123456789012"
 )
@@ -155,10 +135,10 @@ opportunity <- grantsgov_get_opportunity(
 ## List and download extracts
 
 The metadata request runs when `GRANTS_GOV_API_KEY` is set and
-`GRANTSGOV_README_LIVE=true`. The download example is left unevaluated
-because it writes a file.
+`GRANTSGOV_README_LIVE=true`. The download example is left unevaluated because
+it writes a file.
 
-``` r
+```{r list-extracts, eval = run_live_api}
 extracts <- grantsgov_list_extracts(
   filters = list(
     extract_type = "opportunities_json",
@@ -173,13 +153,13 @@ extracts <- grantsgov_list_extracts(
 length(extracts$data)
 ```
 
-``` r
+```{r download-extract, eval = FALSE}
 grantsgov_download_extract(extracts$data[[1]], "opportunities.json")
 ```
 
 ## Errors and rate limits
 
-HTTP errors include the status code, API-provided error message when
-available, and any returned rate-limit headers such as `Retry-After`,
-`X-RateLimit-Remaining`, or `RateLimit-Reset`. A `429` response is
-reported with retry/backoff guidance.
+HTTP errors include the status code, API-provided error message when available,
+and any returned rate-limit headers such as `Retry-After`,
+`X-RateLimit-Remaining`, or `RateLimit-Reset`. A `429` response is reported with
+retry/backoff guidance.
