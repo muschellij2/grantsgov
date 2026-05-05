@@ -89,3 +89,79 @@ test_that("generic paginator stops on short pages and validates inputs", {
   expect_error(grant_paginate(endpoint, max_pages = 0), "max_pages")
   expect_error(grant_paginate(endpoint, data_field = ""), "data_field")
 })
+
+test_that("recent opportunities builds a post_date window for day and week", {
+  calls <- list()
+  testthat::local_mocked_bindings(
+    grant_search_all_opportunities = function(query, query_operator, filters, page_size,
+                                              page_offset, sort_order, max_pages,
+                                              api_key, base_url) {
+      calls[[length(calls) + 1L]] <<- list(
+        query = query,
+        query_operator = query_operator,
+        filters = filters,
+        page_size = page_size,
+        page_offset = page_offset,
+        sort_order = sort_order,
+        max_pages = max_pages,
+        api_key = api_key,
+        base_url = base_url
+      )
+      list(list(id = "one"))
+    },
+    .package = "grantsgov"
+  )
+
+  day <- grant_recent_opportunities(
+    "day",
+    end_date = as.Date("2026-05-05"),
+    query = "education",
+    filters = list(opportunity_status = grant_filter_one_of("posted")),
+    api_key = "key",
+    base_url = "https://example.test",
+    max_pages = 1
+  )
+  week <- grant_recent_opportunities(
+    "week",
+    end_date = as.Date("2026-05-05"),
+    api_key = "key",
+    base_url = "https://example.test",
+    max_pages = 1
+  )
+
+  expect_equal(length(day), 1)
+  expect_equal(calls[[1]]$query, "education")
+  expect_equal(calls[[1]]$filters$post_date, list(start_date = "2026-05-04", end_date = "2026-05-05"))
+  expect_equal(calls[[1]]$filters$opportunity_status$one_of, "posted")
+  expect_equal(calls[[1]]$sort_order$order_by, "post_date")
+  expect_equal(calls[[1]]$max_pages, 1)
+  expect_equal(calls[[2]]$filters$post_date, list(start_date = "2026-04-28", end_date = "2026-05-05"))
+  expect_equal(length(week), 1)
+})
+
+test_that("recent opportunities supports custom days and validates inputs", {
+  captured <- NULL
+  testthat::local_mocked_bindings(
+    grant_search_all_opportunities = function(query, query_operator, filters, page_size,
+                                              page_offset, sort_order, max_pages,
+                                              api_key, base_url) {
+      captured <<- filters
+      list()
+    },
+    .package = "grantsgov"
+  )
+
+  grant_recent_opportunities(
+    days = 3,
+    end_date = as.Date("2026-05-05"),
+    api_key = "key",
+    base_url = "https://example.test"
+  )
+
+  expect_equal(captured$post_date, list(start_date = "2026-05-02", end_date = "2026-05-05"))
+  expect_error(
+    grant_recent_opportunities(filters = list(post_date = list()), api_key = "key"),
+    "post_date"
+  )
+  expect_error(grant_recent_opportunities(days = 0, api_key = "key"), "days")
+})

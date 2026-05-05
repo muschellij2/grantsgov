@@ -137,6 +137,19 @@ length(all_results)
 attr(all_results, "pagination_info")
 ```
 
+## Recent opportunities
+
+Use `grant_recent_opportunities()` to paginate through opportunities posted in
+the last day or last week. The API exposes this as a `post_date` filter.
+
+```{r recent-opportunities, eval = FALSE}
+last_day <- grant_recent_opportunities("day")
+last_week <- grant_recent_opportunities("week")
+
+length(last_day)
+length(last_week)
+```
+
 ## Get opportunity details
 
 This example needs a real opportunity UUID from the API.

@@ -53,8 +53,9 @@ package metadata.
 grant_base_url()
 #> [1] "https://api.simpler.grants.gov"
 names(grant_endpoints()$endpoints)
-#> [1] "search_opportunities" "get_opportunity"      "list_extracts"       
-#> [4] "health"
+#> [1] "search_opportunities"   "search_agencies"        "get_opportunity"       
+#> [4] "get_opportunity_legacy" "list_extracts"          "common_grants"         
+#> [7] "organizations"          "health"
 grant_endpoints()$endpoints$health
 #> $method
 #> [1] "GET"
@@ -166,6 +167,20 @@ all_results <- grant_search_all_opportunities(
 
 length(all_results)
 attr(all_results, "pagination_info")
+```
+
+## Recent opportunities
+
+Use `grant_recent_opportunities()` to paginate through opportunities
+posted in the last day or last week. The API exposes this as a
+`post_date` filter.
+
+``` r
+last_day <- grant_recent_opportunities("day")
+last_week <- grant_recent_opportunities("week")
+
+length(last_day)
+length(last_week)
 ```
 
 ## Get opportunity details

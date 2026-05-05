@@ -24,6 +24,53 @@ grant_health <- function(base_url = grant_base_url()) {
   grant_handle_response(grant_perform(req))
 }
 
+#' Search agencies
+#'
+#' Maps to `POST /v1/agencies/search`.
+#'
+#' @param query Optional free-text query.
+#' @param query_operator Query operator, `"AND"` or `"OR"`.
+#' @param filters Named list of agency filters. Documented filters include
+#'   `has_active_opportunity`, `is_test_agency`, and `opportunity_statuses`.
+#' @param pagination Pagination list. Sort fields are `agency_code` and
+#'   `agency_name`.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+#'     identical(tolower(Sys.getenv("GRANTSGOV_EXAMPLES_LIVE")), "true")) {
+#'   agencies <- grant_search_agencies(
+#'     query = "health",
+#'     pagination = grant_pagination(
+#'       page_size = 25,
+#'       sort_order = grant_sort("agency_name", "ascending")
+#'     )
+#'   )
+#'   length(agencies$data)
+#' }
+#' @export
+grant_search_agencies <- function(query = NULL,
+                                  query_operator = c("AND", "OR"),
+                                  filters = list(),
+                                  pagination = grant_pagination(
+                                    sort_order = grant_sort("agency_name", "ascending")
+                                  ),
+                                  api_key = grant_api_key(),
+                                  base_url = grant_base_url()) {
+  query_operator <- match.arg(query_operator)
+  body <- grant_compact_list(list(
+    query = query,
+    query_operator = query_operator,
+    filters = grant_non_empty_filters(filters),
+    pagination = pagination
+  ))
+
+  grant_post_json("/v1/agencies/search", body, api_key, base_url)
+}
+
 #' Search grant opportunities
 #'
 #' Maps to `POST /v1/opportunities/search`.
@@ -67,12 +114,12 @@ grant_health <- function(base_url = grant_base_url()) {
 #' }
 #' @export
 grant_search_opportunities <- function(query = NULL,
-                                           query_operator = c("AND", "OR"),
-                                           filters = list(),
-                                           pagination = grant_pagination(),
-                                           format = c("json", "csv"),
-                                           api_key = grant_api_key(),
-                                           base_url = grant_base_url()) {
+                                       query_operator = c("AND", "OR"),
+                                       filters = list(),
+                                       pagination = grant_pagination(),
+                                       format = c("json", "csv"),
+                                       api_key = grant_api_key(),
+                                       base_url = grant_base_url()) {
   query_operator <- match.arg(query_operator)
   format <- match.arg(format)
 
@@ -113,13 +160,48 @@ grant_search_opportunities <- function(query = NULL,
 #' }
 #' @export
 grant_get_opportunity <- function(opportunity_id,
-                                      api_key = grant_api_key(),
-                                      base_url = grant_base_url()) {
+                                  api_key = grant_api_key(),
+                                  base_url = grant_base_url()) {
   if (!is.character(opportunity_id) || length(opportunity_id) != 1 || !nzchar(opportunity_id)) {
     stop("`opportunity_id` must be a non-empty string.", call. = FALSE)
   }
 
   path <- paste0("/v1/opportunities/", opportunity_id)
+  req <- grant_request(path, "GET", api_key, base_url)
+
+  grant_handle_response(grant_perform(req))
+}
+
+#' Retrieve opportunity details by legacy opportunity ID
+#'
+#' Maps to `GET /v1/opportunities/{legacy_opportunity_id}`.
+#'
+#' @param legacy_opportunity_id Numeric legacy opportunity ID.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+#'     identical(tolower(Sys.getenv("GRANTSGOV_EXAMPLES_LIVE")), "true")) {
+#'   search <- grant_search_opportunities(
+#'     query = "education",
+#'     pagination = grant_pagination(page_size = 1)
+#'   )
+#'   legacy_id <- search$data[[1]]$legacy_opportunity_id
+#'   grant_get_opportunity_legacy(legacy_id)
+#' }
+#' @export
+grant_get_opportunity_legacy <- function(legacy_opportunity_id,
+                                         api_key = grant_api_key(),
+                                         base_url = grant_base_url()) {
+  if (!is.numeric(legacy_opportunity_id) || length(legacy_opportunity_id) != 1 ||
+      is.na(legacy_opportunity_id)) {
+    stop("`legacy_opportunity_id` must be a single numeric ID.", call. = FALSE)
+  }
+
+  path <- paste0("/v1/opportunities/", as.integer(legacy_opportunity_id))
   req <- grant_request(path, "GET", api_key, base_url)
 
   grant_handle_response(grant_perform(req))
@@ -152,11 +234,11 @@ grant_get_opportunity <- function(opportunity_id,
 #' }
 #' @export
 grant_list_extracts <- function(filters = list(),
-                                    pagination = grant_pagination(
-                                      sort_order = grant_sort("created_at")
-                                    ),
-                                    api_key = grant_api_key(),
-                                    base_url = grant_base_url()) {
+                                pagination = grant_pagination(
+                                  sort_order = grant_sort("created_at")
+                                ),
+                                api_key = grant_api_key(),
+                                base_url = grant_base_url()) {
   body <- grant_compact_list(list(
     filters = grant_non_empty_filters(filters),
     pagination = pagination
@@ -277,11 +359,413 @@ grant_read_extract <- function(extract,
   data
 }
 
+#' List CommonGrants opportunities
+#'
+#' Maps to `GET /common-grants/opportunities`.
+#'
+#' @param page Page number.
+#' @param page_size Number of records per page.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+#'     identical(tolower(Sys.getenv("GRANTSGOV_EXAMPLES_LIVE")), "true")) {
+#'   grant_common_grants_list_opportunities(page = 1, page_size = 10)
+#' }
+#' @export
+grant_common_grants_list_opportunities <- function(page = 1,
+                                                   page_size = 25,
+                                                   api_key = grant_api_key(),
+                                                   base_url = grant_base_url()) {
+  req <- grant_request("/common-grants/opportunities", "GET", api_key, base_url)
+  req <- httr2::req_url_query(req, page = page, pageSize = page_size)
+  grant_handle_response(grant_perform(req))
+}
+
+#' Search CommonGrants opportunities
+#'
+#' Maps to `POST /common-grants/opportunities/search`.
+#'
+#' @param search Optional search query string.
+#' @param filters CommonGrants opportunity filters.
+#' @param pagination CommonGrants pagination parameters.
+#' @param sorting CommonGrants sorting parameters.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+#'     identical(tolower(Sys.getenv("GRANTSGOV_EXAMPLES_LIVE")), "true")) {
+#'   grant_common_grants_search_opportunities(
+#'     search = "education",
+#'     pagination = list(page = 1, pageSize = 10)
+#'   )
+#' }
+#' @export
+grant_common_grants_search_opportunities <- function(search = NULL,
+                                                     filters = list(),
+                                                     pagination = list(page = 1, pageSize = 25),
+                                                     sorting = NULL,
+                                                     api_key = grant_api_key(),
+                                                     base_url = grant_base_url()) {
+  body <- grant_compact_list(list(
+    search = search,
+    filters = grant_non_empty_filters(filters),
+    pagination = pagination,
+    sorting = sorting
+  ))
+
+  grant_post_json("/common-grants/opportunities/search", body, api_key, base_url)
+}
+
+#' Retrieve CommonGrants opportunity details
+#'
+#' Maps to `GET /common-grants/opportunities/{oppId}`.
+#'
+#' @param opportunity_id CommonGrants opportunity ID.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+#'     identical(tolower(Sys.getenv("GRANTSGOV_EXAMPLES_LIVE")), "true")) {
+#'   opportunities <- grant_common_grants_list_opportunities(page = 1, page_size = 1)
+#'   grant_common_grants_get_opportunity(opportunities$items[[1]]$id)
+#' }
+#' @export
+grant_common_grants_get_opportunity <- function(opportunity_id,
+                                                api_key = grant_api_key(),
+                                                base_url = grant_base_url()) {
+  path <- paste0("/common-grants/opportunities/", opportunity_id)
+  req <- grant_request(path, "GET", api_key, base_url)
+  grant_handle_response(grant_perform(req))
+}
+
+#' Get organization information
+#'
+#' Maps to `GET /v1/organizations/{organization_id}`.
+#'
+#' @param organization_id Organization UUID.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_get_organization("organization-uuid")
+#' }
+#' @export
+grant_get_organization <- function(organization_id,
+                                   api_key = grant_api_key(),
+                                   base_url = grant_base_url()) {
+  grant_get_path(paste0("/v1/organizations/", organization_id), api_key, base_url)
+}
+
+#' Create an organization invitation
+#'
+#' Maps to `POST /v1/organizations/{organization_id}/invitations`.
+#'
+#' @param organization_id Organization UUID.
+#' @param invitee_email Email address to invite.
+#' @param role_ids Character vector of role IDs.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_create_organization_invitation(
+#'   "organization-uuid",
+#'   invitee_email = "new.member@example.com",
+#'   role_ids = c("role-uuid")
+#' )
+#' }
+#' @export
+grant_create_organization_invitation <- function(organization_id,
+                                                 invitee_email,
+                                                 role_ids,
+                                                 api_key = grant_api_key(),
+                                                 base_url = grant_base_url()) {
+  body <- list(invitee_email = invitee_email, role_ids = role_ids)
+  grant_post_json(paste0("/v1/organizations/", organization_id, "/invitations"), body, api_key, base_url)
+}
+
+#' List organization invitations
+#'
+#' Maps to `POST /v1/organizations/{organization_id}/invitations/list`.
+#'
+#' @param organization_id Organization UUID.
+#' @param filters Named list of invitation filters.
+#' @param pagination Pagination list.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_list_organization_invitations(
+#'   "organization-uuid",
+#'   filters = list(status = grant_filter_one_of("pending"))
+#' )
+#' }
+#' @export
+grant_list_organization_invitations <- function(organization_id,
+                                                filters = list(),
+                                                pagination = grant_pagination(),
+                                                api_key = grant_api_key(),
+                                                base_url = grant_base_url()) {
+  body <- grant_compact_list(list(filters = grant_non_empty_filters(filters), pagination = pagination))
+  grant_post_json(paste0("/v1/organizations/", organization_id, "/invitations/list"), body, api_key, base_url)
+}
+
+#' List organization legacy users
+#'
+#' Maps to `POST /v1/organizations/{organization_id}/legacy-users`.
+#'
+#' @param organization_id Organization UUID.
+#' @param filters Named list of legacy-user filters.
+#' @param pagination Pagination list.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_list_organization_legacy_users(
+#'   "organization-uuid",
+#'   filters = list(status = grant_filter_one_of("available"))
+#' )
+#' }
+#' @export
+grant_list_organization_legacy_users <- function(organization_id,
+                                                 filters = list(),
+                                                 pagination = grant_pagination(),
+                                                 api_key = grant_api_key(),
+                                                 base_url = grant_base_url()) {
+  body <- grant_compact_list(list(filters = grant_non_empty_filters(filters), pagination = pagination))
+  grant_post_json(paste0("/v1/organizations/", organization_id, "/legacy-users"), body, api_key, base_url)
+}
+
+#' Ignore a legacy user for an organization
+#'
+#' Maps to `POST /v1/organizations/{organization_id}/legacy-users/ignore`.
+#'
+#' @param organization_id Organization UUID.
+#' @param email Legacy user email address.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_ignore_organization_legacy_user("organization-uuid", "legacy@example.com")
+#' }
+#' @export
+grant_ignore_organization_legacy_user <- function(organization_id,
+                                                  email,
+                                                  api_key = grant_api_key(),
+                                                  base_url = grant_base_url()) {
+  grant_post_json(
+    paste0("/v1/organizations/", organization_id, "/legacy-users/ignore"),
+    list(email = email),
+    api_key,
+    base_url
+  )
+}
+
+#' List organization roles
+#'
+#' Maps to `POST /v1/organizations/{organization_id}/roles/list`.
+#'
+#' @param organization_id Organization UUID.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_list_organization_roles("organization-uuid")
+#' }
+#' @export
+grant_list_organization_roles <- function(organization_id,
+                                          api_key = grant_api_key(),
+                                          base_url = grant_base_url()) {
+  grant_post_json(paste0("/v1/organizations/", organization_id, "/roles/list"), list(), api_key, base_url)
+}
+
+#' Save an opportunity for an organization
+#'
+#' Maps to `POST /v1/organizations/{organization_id}/saved-opportunities`.
+#'
+#' @param organization_id Organization UUID.
+#' @param opportunity_id Opportunity UUID.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_save_organization_opportunity("organization-uuid", "opportunity-uuid")
+#' }
+#' @export
+grant_save_organization_opportunity <- function(organization_id,
+                                                opportunity_id,
+                                                api_key = grant_api_key(),
+                                                base_url = grant_base_url()) {
+  body <- list(opportunity_id = opportunity_id)
+  grant_post_json(paste0("/v1/organizations/", organization_id, "/saved-opportunities"), body, api_key, base_url)
+}
+
+#' Delete an organization saved opportunity
+#'
+#' Maps to `DELETE /v1/organizations/{organization_id}/saved-opportunities/{opportunity_id}`.
+#'
+#' @param organization_id Organization UUID.
+#' @param opportunity_id Opportunity UUID.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_delete_organization_saved_opportunity("organization-uuid", "opportunity-uuid")
+#' }
+#' @export
+grant_delete_organization_saved_opportunity <- function(organization_id,
+                                                        opportunity_id,
+                                                        api_key = grant_api_key(),
+                                                        base_url = grant_base_url()) {
+  grant_delete_path(
+    paste0("/v1/organizations/", organization_id, "/saved-opportunities/", opportunity_id),
+    api_key,
+    base_url
+  )
+}
+
+#' List organization users
+#'
+#' Maps to `POST /v1/organizations/{organization_id}/users`.
+#'
+#' @param organization_id Organization UUID.
+#' @param pagination Pagination list.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_list_organization_users("organization-uuid")
+#' }
+#' @export
+grant_list_organization_users <- function(organization_id,
+                                          pagination = grant_pagination(),
+                                          api_key = grant_api_key(),
+                                          base_url = grant_base_url()) {
+  grant_post_json(
+    paste0("/v1/organizations/", organization_id, "/users"),
+    list(pagination = pagination),
+    api_key,
+    base_url
+  )
+}
+
+#' Remove a user from an organization
+#'
+#' Maps to `DELETE /v1/organizations/{organization_id}/users/{user_id}`.
+#'
+#' @param organization_id Organization UUID.
+#' @param user_id User UUID.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_remove_organization_user("organization-uuid", "user-uuid")
+#' }
+#' @export
+grant_remove_organization_user <- function(organization_id,
+                                           user_id,
+                                           api_key = grant_api_key(),
+                                           base_url = grant_base_url()) {
+  grant_delete_path(paste0("/v1/organizations/", organization_id, "/users/", user_id), api_key, base_url)
+}
+
+#' Update roles for an organization user
+#'
+#' Maps to `PUT /v1/organizations/{organization_id}/users/{user_id}`.
+#'
+#' @param organization_id Organization UUID.
+#' @param user_id User UUID.
+#' @param role_ids Character vector of role IDs.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return Parsed JSON as a list.
+#'
+#' @examples
+#' \dontrun{
+#' grant_update_organization_user_roles(
+#'   "organization-uuid",
+#'   "user-uuid",
+#'   role_ids = c("role-uuid")
+#' )
+#' }
+#' @export
+grant_update_organization_user_roles <- function(organization_id,
+                                                 user_id,
+                                                 role_ids,
+                                                 api_key = grant_api_key(),
+                                                 base_url = grant_base_url()) {
+  grant_put_json(
+    paste0("/v1/organizations/", organization_id, "/users/", user_id),
+    list(role_ids = role_ids),
+    api_key,
+    base_url
+  )
+}
+
 # POST a JSON body and parse the response.
 grant_post_json <- function(path, body, api_key, base_url) {
   req <- grant_request(path, "POST", api_key, base_url)
   req <- httr2::req_body_json(req, body, auto_unbox = TRUE)
 
+  grant_handle_response(grant_perform(req))
+}
+
+# GET a JSON endpoint and parse the response.
+grant_get_path <- function(path, api_key, base_url) {
+  req <- grant_request(path, "GET", api_key, base_url)
+  grant_handle_response(grant_perform(req))
+}
+
+# PUT a JSON body and parse the response.
+grant_put_json <- function(path, body, api_key, base_url) {
+  req <- grant_request(path, "PUT", api_key, base_url)
+  req <- httr2::req_body_json(req, body, auto_unbox = TRUE)
+  grant_handle_response(grant_perform(req))
+}
+
+# DELETE a path and parse the response.
+grant_delete_path <- function(path, api_key, base_url) {
+  req <- grant_request(path, "DELETE", api_key, base_url)
   grant_handle_response(grant_perform(req))
 }
 

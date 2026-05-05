@@ -63,15 +63,55 @@ grant_endpoints <- function() {
         path = "/v1/opportunities/search",
         function_name = "grant_search_opportunities"
       ),
+      search_agencies = list(
+        method = "POST",
+        path = "/v1/agencies/search",
+        function_name = "grant_search_agencies"
+      ),
       get_opportunity = list(
         method = "GET",
         path = "/v1/opportunities/{opportunity_id}",
         function_name = "grant_get_opportunity"
       ),
+      get_opportunity_legacy = list(
+        method = "GET",
+        path = "/v1/opportunities/{legacy_opportunity_id}",
+        function_name = "grant_get_opportunity_legacy"
+      ),
       list_extracts = list(
         method = "POST",
         path = "/v1/extracts",
         function_name = "grant_list_extracts"
+      ),
+      common_grants = list(
+        list_opportunities = list(
+          method = "GET",
+          path = "/common-grants/opportunities",
+          function_name = "grant_common_grants_list_opportunities"
+        ),
+        search_opportunities = list(
+          method = "POST",
+          path = "/common-grants/opportunities/search",
+          function_name = "grant_common_grants_search_opportunities"
+        ),
+        get_opportunity = list(
+          method = "GET",
+          path = "/common-grants/opportunities/{oppId}",
+          function_name = "grant_common_grants_get_opportunity"
+        )
+      ),
+      organizations = list(
+        get = list(method = "GET", path = "/v1/organizations/{organization_id}", function_name = "grant_get_organization"),
+        create_invitation = list(method = "POST", path = "/v1/organizations/{organization_id}/invitations", function_name = "grant_create_organization_invitation"),
+        list_invitations = list(method = "POST", path = "/v1/organizations/{organization_id}/invitations/list", function_name = "grant_list_organization_invitations"),
+        list_legacy_users = list(method = "POST", path = "/v1/organizations/{organization_id}/legacy-users", function_name = "grant_list_organization_legacy_users"),
+        ignore_legacy_user = list(method = "POST", path = "/v1/organizations/{organization_id}/legacy-users/ignore", function_name = "grant_ignore_organization_legacy_user"),
+        list_roles = list(method = "POST", path = "/v1/organizations/{organization_id}/roles/list", function_name = "grant_list_organization_roles"),
+        save_opportunity = list(method = "POST", path = "/v1/organizations/{organization_id}/saved-opportunities", function_name = "grant_save_organization_opportunity"),
+        delete_saved_opportunity = list(method = "DELETE", path = "/v1/organizations/{organization_id}/saved-opportunities/{opportunity_id}", function_name = "grant_delete_organization_saved_opportunity"),
+        list_users = list(method = "POST", path = "/v1/organizations/{organization_id}/users", function_name = "grant_list_organization_users"),
+        remove_user = list(method = "DELETE", path = "/v1/organizations/{organization_id}/users/{user_id}", function_name = "grant_remove_organization_user"),
+        update_user_roles = list(method = "PUT", path = "/v1/organizations/{organization_id}/users/{user_id}", function_name = "grant_update_organization_user_roles")
       ),
       health = list(
         method = "GET",

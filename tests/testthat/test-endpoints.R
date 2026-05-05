@@ -42,6 +42,48 @@ test_that("search opportunities posts the expected body and parses JSON", {
   expect_equal(captured$body$data$pagination$page_size, 5L)
 })
 
+test_that("agency search posts expected body", {
+  captured <- NULL
+  testthat::local_mocked_bindings(
+    grant_perform = function(req) {
+      captured <<- req
+      json_resp(body = '{"data":[{"agency_code":"ABC"}]}')
+    },
+    .package = "grantsgov"
+  )
+
+  out <- grant_search_agencies(
+    query = "health",
+    filters = list(has_active_opportunity = grant_filter_one_of(TRUE)),
+    api_key = "key",
+    base_url = "https://example.test"
+  )
+
+  expect_equal(out$data[[1]]$agency_code, "ABC")
+  expect_equal(captured$method, "POST")
+  expect_match(captured$url, "/v1/agencies/search", fixed = TRUE)
+  expect_equal(captured$body$data$query, "health")
+  expect_equal(captured$body$data$filters$has_active_opportunity$one_of, TRUE)
+})
+
+test_that("legacy opportunity lookup uses numeric legacy id", {
+  captured <- NULL
+  testthat::local_mocked_bindings(
+    grant_perform = function(req) {
+      captured <<- req
+      json_resp(body = '{"data":{"legacy_opportunity_id":123}}')
+    },
+    .package = "grantsgov"
+  )
+
+  out <- grant_get_opportunity_legacy(123, api_key = "key", base_url = "https://example.test")
+
+  expect_equal(out$data$legacy_opportunity_id, 123)
+  expect_equal(captured$method, "GET")
+  expect_match(captured$url, "/v1/opportunities/123", fixed = TRUE)
+  expect_error(grant_get_opportunity_legacy("123", api_key = "key"), "legacy_opportunity_id")
+})
+
 test_that("search opportunities omits empty filters for the live API", {
   captured <- NULL
   testthat::local_mocked_bindings(
@@ -311,4 +353,74 @@ test_that("read extract warns when readr reports parsing problems", {
   )
   expect_gt(nrow(readr::problems(data)), 0)
   expect_true(file.exists(attr(data, "file")))
+})
+
+test_that("common grants endpoints map to current protocol paths", {
+  calls <- list()
+  testthat::local_mocked_bindings(
+    grant_perform = function(req) {
+      calls[[length(calls) + 1L]] <<- req
+      json_resp(body = '{"data":[]}')
+    },
+    .package = "grantsgov"
+  )
+
+  grant_common_grants_list_opportunities(page = 2, page_size = 50, api_key = "key", base_url = "https://example.test")
+  grant_common_grants_search_opportunities(
+    search = "health",
+    filters = list(status = "open"),
+    pagination = list(page = 1, pageSize = 10),
+    sorting = list(sortBy = "title"),
+    api_key = "key",
+    base_url = "https://example.test"
+  )
+  grant_common_grants_get_opportunity("opp-1", api_key = "key", base_url = "https://example.test")
+
+  expect_equal(calls[[1]]$method, "GET")
+  expect_match(calls[[1]]$url, "/common-grants/opportunities", fixed = TRUE)
+  expect_match(calls[[1]]$url, "page=2", fixed = TRUE)
+  expect_equal(calls[[2]]$method, "POST")
+  expect_match(calls[[2]]$url, "/common-grants/opportunities/search", fixed = TRUE)
+  expect_equal(calls[[2]]$body$data$search, "health")
+  expect_equal(calls[[3]]$method, "GET")
+  expect_match(calls[[3]]$url, "/common-grants/opportunities/opp-1", fixed = TRUE)
+})
+
+test_that("organization endpoints map methods, paths, and bodies", {
+  calls <- list()
+  testthat::local_mocked_bindings(
+    grant_perform = function(req) {
+      calls[[length(calls) + 1L]] <<- req
+      json_resp(body = '{"data":{"ok":true}}')
+    },
+    .package = "grantsgov"
+  )
+
+  org <- "org-1"
+  grant_get_organization(org, api_key = "key", base_url = "https://example.test")
+  grant_create_organization_invitation(org, "a@example.com", c("role-1"), api_key = "key", base_url = "https://example.test")
+  grant_list_organization_invitations(org, filters = list(status = grant_filter_one_of("pending")), api_key = "key", base_url = "https://example.test")
+  grant_list_organization_legacy_users(org, filters = list(status = grant_filter_one_of("available")), api_key = "key", base_url = "https://example.test")
+  grant_ignore_organization_legacy_user(org, "legacy@example.com", api_key = "key", base_url = "https://example.test")
+  grant_list_organization_roles(org, api_key = "key", base_url = "https://example.test")
+  grant_save_organization_opportunity(org, "opp-1", api_key = "key", base_url = "https://example.test")
+  grant_delete_organization_saved_opportunity(org, "opp-1", api_key = "key", base_url = "https://example.test")
+  grant_list_organization_users(org, api_key = "key", base_url = "https://example.test")
+  grant_remove_organization_user(org, "user-1", api_key = "key", base_url = "https://example.test")
+  grant_update_organization_user_roles(org, "user-1", c("role-2"), api_key = "key", base_url = "https://example.test")
+
+  expect_equal(vapply(calls, `[[`, character(1), "method"),
+               c("GET", "POST", "POST", "POST", "POST", "POST", "POST", "DELETE", "POST", "DELETE", "PUT"))
+  expect_match(calls[[1]]$url, "/v1/organizations/org-1", fixed = TRUE)
+  expect_equal(calls[[2]]$body$data$invitee_email, "a@example.com")
+  expect_equal(calls[[2]]$body$data$role_ids, "role-1")
+  expect_equal(calls[[3]]$body$data$filters$status$one_of, "pending")
+  expect_equal(calls[[4]]$body$data$filters$status$one_of, "available")
+  expect_equal(calls[[5]]$body$data$email, "legacy@example.com")
+  expect_match(calls[[6]]$url, "/roles/list", fixed = TRUE)
+  expect_equal(calls[[7]]$body$data$opportunity_id, "opp-1")
+  expect_match(calls[[8]]$url, "/saved-opportunities/opp-1", fixed = TRUE)
+  expect_equal(calls[[9]]$body$data$pagination$page_offset, 1L)
+  expect_match(calls[[10]]$url, "/users/user-1", fixed = TRUE)
+  expect_equal(calls[[11]]$body$data$role_ids, "role-2")
 })

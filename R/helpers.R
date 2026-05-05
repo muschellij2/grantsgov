@@ -256,6 +256,77 @@ grant_search_all_opportunities <- function(query = NULL,
   )
 }
 
+#' Get recently posted opportunities
+#'
+#' Convenience wrapper for getting all opportunities posted in the last day or
+#' last week. The Simpler Grants.gov opportunity search endpoint exposes this
+#' as the `post_date` filter, so "created" opportunities are interpreted as
+#' opportunities posted within the requested date window.
+#'
+#' @param period Recent window, either `"day"` or `"week"`.
+#' @param days Optional custom number of days to look back. If supplied, this
+#'   overrides `period`.
+#' @param end_date Last date in the date window. Defaults to today.
+#' @param query Optional free-text query.
+#' @param query_operator Query operator, `"AND"` or `"OR"`.
+#' @param filters Additional search filters. Do not include `post_date`; this
+#'   function sets it from `period`, `days`, and `end_date`.
+#' @param page_size Number of records per page.
+#' @param page_offset First page offset.
+#' @param sort_order Sort specification. Defaults to `post_date` descending.
+#' @param max_pages Maximum number of pages to request.
+#' @param api_key API key. Defaults to `GRANTS_GOV_API_KEY`.
+#' @param base_url API base URL.
+#'
+#' @return A list of opportunity search records.
+#'
+#' @examples
+#' if (nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+#'     identical(tolower(Sys.getenv("GRANTSGOV_EXAMPLES_LIVE")), "true")) {
+#'   last_day <- grant_recent_opportunities("day", max_pages = 1)
+#'   last_week <- grant_recent_opportunities("week", max_pages = 1)
+#'   length(last_day)
+#'   length(last_week)
+#' }
+#' @export
+grant_recent_opportunities <- function(period = c("day", "week"),
+                                       days = NULL,
+                                       end_date = Sys.Date(),
+                                       query = NULL,
+                                       query_operator = c("AND", "OR"),
+                                       filters = list(),
+                                       page_size = 5000,
+                                       page_offset = 1,
+                                       sort_order = grant_sort("post_date"),
+                                       max_pages = Inf,
+                                       api_key = grant_api_key(),
+                                       base_url = grant_base_url()) {
+  period <- match.arg(period)
+  query_operator <- match.arg(query_operator)
+
+  if (!is.null(filters$post_date)) {
+    stop("`filters` must not include `post_date`; use `period`, `days`, and `end_date`.", call. = FALSE)
+  }
+
+  lookback_days <- grant_recent_days(period, days)
+  end_date <- as.Date(end_date)
+  start_date <- end_date - lookback_days
+
+  filters$post_date <- grant_filter_date_range(start_date, end_date)
+
+  grant_search_all_opportunities(
+    query = query,
+    query_operator = query_operator,
+    filters = filters,
+    page_size = page_size,
+    page_offset = page_offset,
+    sort_order = sort_order,
+    max_pages = max_pages,
+    api_key = api_key,
+    base_url = base_url
+  )
+}
+
 #' Build a `one_of` filter
 #'
 #' @param values Values accepted by the API for the selected filter.
@@ -345,4 +416,20 @@ grant_match_endpoint_function <- function(.f) {
   }
 
   stop("`.f` must be a function or a function name.", call. = FALSE)
+}
+
+# Convert a named recent period or custom day count into a lookback window.
+grant_recent_days <- function(period, days = NULL) {
+  if (!is.null(days)) {
+    if (!is.numeric(days) || length(days) != 1 || is.na(days) || days < 1) {
+      stop("`days` must be NULL or a single positive number.", call. = FALSE)
+    }
+    return(as.integer(days))
+  }
+
+  switch(
+    period,
+    day = 1L,
+    week = 7L
+  )
 }
