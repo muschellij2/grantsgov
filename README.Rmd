@@ -1,8 +1,5 @@
 ---
-output:
-  github_document:
-    toc: false
-    html_preview: false
+output: github_document
 ---
 
 ```{r, include = FALSE}
