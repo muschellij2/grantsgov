@@ -1,7 +1,7 @@
 # Shared httr2 request and response handling.
 
 # Build an authenticated API request for endpoint wrappers.
-grantsgov_request <- function(path, method, api_key, base_url = grantsgov_base_url()) {
+grant_request <- function(path, method, api_key, base_url = grant_base_url()) {
   req <- httr2::request(base_url)
   req <- httr2::req_url_path_append(req, path)
   req <- httr2::req_method(req, method)
@@ -11,12 +11,13 @@ grantsgov_request <- function(path, method, api_key, base_url = grantsgov_base_u
 }
 
 # Small wrapper kept separate so tests can stub network behavior cleanly.
-grantsgov_perform <- function(req) {
+grant_perform <- function(req) {
+  req <- httr2::req_error(req, is_error = function(resp) FALSE)
   httr2::req_perform(req)
 }
 
 # Decode a successful response according to its content type.
-grantsgov_parse_response <- function(resp) {
+grant_parse_response <- function(resp) {
   content_type <- httr2::resp_content_type(resp)
 
   if (identical(content_type, "application/json")) {
@@ -31,25 +32,25 @@ grantsgov_parse_response <- function(resp) {
 }
 
 # Stop on HTTP errors and include API message plus rate-limit metadata.
-grantsgov_handle_response <- function(resp) {
+grant_handle_response <- function(resp) {
   if (!httr2::resp_is_error(resp)) {
-    return(grantsgov_parse_response(resp))
+    return(grant_parse_response(resp))
   }
 
-  stop(grantsgov_response_error_message(resp), call. = FALSE)
+  stop(grant_response_error_message(resp), call. = FALSE)
 }
 
 # Compose a readable error message from status, body, and selected headers.
-grantsgov_response_error_message <- function(resp) {
+grant_response_error_message <- function(resp) {
   status <- httr2::resp_status(resp)
   status_desc <- httr2::resp_status_desc(resp)
-  body_message <- grantsgov_error_body_message(resp)
-  rate_limit_message <- grantsgov_rate_limit_message(resp)
+  body_message <- grant_error_body_message(resp)
+  rate_limit_message <- grant_rate_limit_message(resp)
 
   paste(
-    grantsgov_compact_character(c(
+    grant_compact_character(c(
       sprintf("Grants.gov API request failed [%s %s].", status, status_desc),
-      grantsgov_status_guidance(status),
+      grant_status_guidance(status),
       body_message,
       rate_limit_message
     )),
@@ -58,7 +59,7 @@ grantsgov_response_error_message <- function(resp) {
 }
 
 # Extract a compact message from JSON or text error bodies.
-grantsgov_error_body_message <- function(resp) {
+grant_error_body_message <- function(resp) {
   if (!httr2::resp_has_body(resp)) {
     return(NULL)
   }
@@ -74,6 +75,11 @@ grantsgov_error_body_message <- function(resp) {
   )
 
   if (is.list(parsed)) {
+    if (is.list(parsed$errors) && length(parsed$errors) > 0) {
+      errors <- vapply(parsed$errors, grant_format_api_error, character(1))
+      return(paste0("API errors: ", paste(errors, collapse = "; "), "."))
+    }
+
     for (field in c("message", "detail", "error")) {
       if (!is.null(parsed[[field]]) && length(parsed[[field]]) == 1) {
         return(paste0("API message: ", parsed[[field]], "."))
@@ -84,8 +90,19 @@ grantsgov_error_body_message <- function(resp) {
   paste0("Response body: ", body)
 }
 
+# Format one validation error from the API's errors array.
+grant_format_api_error <- function(error) {
+  if (!is.list(error)) {
+    return(as.character(error))
+  }
+
+  field <- error$field %||% "unknown field"
+  message <- error$message %||% "Invalid value."
+  paste0(field, ": ", message)
+}
+
 # Add status-specific context for common API failures.
-grantsgov_status_guidance <- function(status) {
+grant_status_guidance <- function(status) {
   switch(
     as.character(status),
     "400" = "Check request parameters and required pagination fields.",
@@ -99,9 +116,9 @@ grantsgov_status_guidance <- function(status) {
 }
 
 # Include rate-limit headers when the gateway returns them.
-grantsgov_rate_limit_message <- function(resp) {
+grant_rate_limit_message <- function(resp) {
   values <- vapply(
-    grantsgov_rate_limit_headers(),
+    grant_rate_limit_headers(),
     function(header) httr2::resp_header(resp, header, default = NA_character_),
     character(1)
   )
@@ -119,7 +136,7 @@ grantsgov_rate_limit_message <- function(resp) {
 }
 
 # Compact character vectors without dropping meaningful empty response bodies.
-grantsgov_compact_character <- function(x) {
+grant_compact_character <- function(x) {
   x[!vapply(x, is.null, logical(1))]
 }
 

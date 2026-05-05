@@ -1,0 +1,236 @@
+---
+title: "Using grantsgov"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Using grantsgov}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  error = FALSE
+)
+
+run_live_api <- nzchar(Sys.getenv("GRANTS_GOV_API_KEY")) &&
+  identical(tolower(Sys.getenv("GRANTSGOV_VIGNETTE_LIVE")), "true")
+```
+
+```{r setup, message = FALSE}
+if (file.exists("../DESCRIPTION") && dir.exists("../R")) {
+  pkgload::load_all(path = "..", quiet = TRUE)
+} else {
+  library(grantsgov)
+}
+```
+
+The `grantsgov` package wraps the Simpler Grants.gov API. It helps you search
+grant opportunities, retrieve details for a specific opportunity, and list bulk
+extract metadata.
+
+Most API requests require an API key. The package reads it from
+`GRANTS_GOV_API_KEY`.
+
+```{r api-key, eval = FALSE}
+Sys.setenv(GRANTS_GOV_API_KEY = "your-api-key")
+```
+
+Live API examples in this vignette run only when both environment variables are
+set:
+
+```{r live-env, eval = FALSE}
+Sys.setenv(
+  GRANTS_GOV_API_KEY = "your-api-key",
+  GRANTSGOV_VIGNETTE_LIVE = "true"
+)
+```
+
+## Discover available endpoints and options
+
+The package documents the API paths, auth header, supported search filters, sort
+fields, extract filters, and rate-limit headers checked by the error handler.
+
+```{r endpoint-options}
+grant_endpoints()$endpoints
+grant_endpoints()$endpoints$health
+grant_search_options()$filters
+grant_search_options()$sort_by
+grant_extract_options()
+grant_rate_limit_headers()
+```
+
+## Common use case: find open education opportunities
+
+A common workflow is to search for open or forecasted opportunities, filter by
+deadline and award size, then sort the results by close date.
+
+```{r build-education-search}
+education_filters <- list(
+  opportunity_status = grant_filter_one_of(c("posted", "forecasted")),
+  close_date = grant_filter_date_range(
+    start_date = Sys.Date(),
+    end_date = Sys.Date() + 90
+  ),
+  award_ceiling = grant_filter_number_range(min = 50000, max = 2000000)
+)
+
+education_pagination <- grant_pagination(
+  page_offset = 1,
+  page_size = 5000,
+  sort_order = grant_sort("close_date", "ascending")
+)
+
+str(education_filters)
+education_pagination
+```
+
+Run the search with `grant_search_opportunities()`.
+
+```{r run-education-search, eval = run_live_api}
+education_results <- grant_search_opportunities(
+  query = "education",
+  filters = education_filters,
+  pagination = education_pagination
+)
+
+length(education_results$data)
+```
+
+## Retrieve details for one opportunity
+
+Search results include opportunity identifiers. Pass one of those identifiers to
+`grant_get_opportunity()` to retrieve the full record.
+
+```{r get-first-opportunity, eval = run_live_api}
+first_id <- education_results$data[[1]]$opportunity_id
+first_opportunity <- grant_get_opportunity(first_id)
+
+names(first_opportunity$data)
+```
+
+If you already know an opportunity ID, call the function directly.
+
+```{r get-known-opportunity, eval = FALSE}
+grant_get_opportunity("12345678-1234-1234-1234-123456789012")
+```
+
+## Paginate through all search results
+
+Use `grant_paginate()` for any endpoint function with a `pagination` argument,
+or use `grant_search_all_opportunities()` for search-specific defaults.
+
+```{r paginate-search, eval = FALSE}
+all_education_results <- grant_search_all_opportunities(
+  query = "education",
+  filters = education_filters,
+  page_size = 5000,
+  sort_order = grant_sort("close_date", "ascending")
+)
+
+length(all_education_results)
+attr(all_education_results, "pagination_info")
+```
+
+## Export search results as CSV text
+
+The search endpoint can return CSV content. This is useful when a downstream
+workflow expects a delimited file.
+
+```{r search-csv, eval = run_live_api}
+csv_text <- grant_search_opportunities(
+  query = "education",
+  filters = education_filters,
+  pagination = education_pagination,
+  format = "csv"
+)
+
+cat(substr(csv_text, 1, 300))
+```
+
+## Common use case: find recent bulk extracts
+
+Bulk extracts are useful when you want a complete snapshot rather than a page of
+search results.
+
+```{r build-extract-search}
+extract_filters <- list(
+  extract_type = "opportunities_csv",
+  created_at = grant_filter_date_range(Sys.Date() - 30, Sys.Date())
+)
+
+extract_pagination <- grant_pagination(
+  page_offset = 1,
+  page_size = 5000,
+  sort_order = grant_sort("created_at", "descending")
+)
+
+extract_filters
+extract_pagination
+```
+
+List available extract metadata with `grant_list_extracts()`.
+
+```{r list-extracts, eval = run_live_api}
+extracts <- grant_list_extracts(
+  filters = extract_filters,
+  pagination = extract_pagination
+)
+
+length(extracts$data)
+```
+
+Download one extract by passing the metadata record or a download URL to
+`grant_download_extract()`. The default output path is a temporary `.csv` file.
+Pass `expected_file_size = extract$file_size_bytes` to verify the downloaded
+byte count against the API metadata.
+
+```{r download-extract, eval = FALSE}
+extract_file <- grant_download_extract(
+  extracts$data[[1]],
+  expected_file_size = extracts$data[[1]]$file_size_bytes
+)
+
+extract_file
+```
+
+Read a CSV extract with `grant_read_extract()`. It downloads the file, reads it
+with `readr::read_csv()`, warns if readr reports parsing problems, and stores
+the downloaded file path in `attr(data, "file")`.
+
+```{r read-extract, eval = FALSE}
+extract_data <- grant_read_extract(
+  extracts$data[[1]],
+  expected_file_size = extracts$data[[1]]$file_size_bytes
+)
+
+attr(extract_data, "file")
+```
+
+Use `grant_list_all_extracts()` to automatically request every page of extract
+metadata.
+
+```{r paginate-extracts, eval = FALSE}
+all_extracts <- grant_list_all_extracts(
+  filters = list(extract_type = "opportunities_csv"),
+  page_size = 5000
+)
+
+length(all_extracts)
+```
+
+## Error handling and rate limits
+
+When the API returns an error, the package reports the HTTP status, a short
+status-specific hint, the API's message body when available, and any rate-limit
+headers returned by the gateway. A `429` response includes retry/backoff
+guidance and rate-limit metadata such as `Retry-After`,
+`X-RateLimit-Remaining`, or `RateLimit-Reset` when present.
+
+```{r key-error, error = TRUE}
+withr::with_envvar(
+  c(GRANTS_GOV_API_KEY = NA),
+  grant_api_key()
+)
+```

@@ -3,8 +3,11 @@
 #' Simpler Grants.gov API base URL
 #'
 #' @return A scalar character URL.
+#'
+#' @examples
+#' grant_base_url()
 #' @export
-grantsgov_base_url <- function() {
+grant_base_url <- function() {
   "https://api.simpler.grants.gov"
 }
 
@@ -17,8 +20,11 @@ grantsgov_base_url <- function() {
 #'
 #' @return A scalar character API key, or `NULL` when `required = FALSE` and no
 #'   key is configured.
+#'
+#' @examples
+#' grant_api_key(required = FALSE)
 #' @export
-grantsgov_api_key <- function(required = TRUE) {
+grant_api_key <- function(required = TRUE) {
   key <- Sys.getenv("GRANTS_GOV_API_KEY", unset = "")
 
   if (!nzchar(key)) {
@@ -38,10 +44,15 @@ grantsgov_api_key <- function(required = TRUE) {
 #'
 #' @return A named list with endpoint paths, authentication details, supported
 #'   filters, sort fields, formats, and rate-limit header names.
+#'
+#' @examples
+#' endpoints <- grant_endpoints()
+#' names(endpoints$endpoints)
+#' endpoints$endpoints$health
 #' @export
-grantsgov_endpoints <- function() {
+grant_endpoints <- function() {
   list(
-    base_url = grantsgov_base_url(),
+    base_url = grant_base_url(),
     authentication = list(
       header = "X-API-Key",
       environment_variable = "GRANTS_GOV_API_KEY"
@@ -50,30 +61,40 @@ grantsgov_endpoints <- function() {
       search_opportunities = list(
         method = "POST",
         path = "/v1/opportunities/search",
-        function_name = "grantsgov_search_opportunities"
+        function_name = "grant_search_opportunities"
       ),
       get_opportunity = list(
         method = "GET",
         path = "/v1/opportunities/{opportunity_id}",
-        function_name = "grantsgov_get_opportunity"
+        function_name = "grant_get_opportunity"
       ),
       list_extracts = list(
         method = "POST",
         path = "/v1/extracts",
-        function_name = "grantsgov_list_extracts"
+        function_name = "grant_list_extracts"
+      ),
+      health = list(
+        method = "GET",
+        path = "/health",
+        function_name = "grant_health"
       )
     ),
-    search = grantsgov_search_options(),
-    extracts = grantsgov_extract_options(),
-    rate_limit_headers = grantsgov_rate_limit_headers()
+    search = grant_search_options(),
+    extracts = grant_extract_options(),
+    rate_limit_headers = grant_rate_limit_headers()
   )
 }
 
 #' List opportunity search options
 #'
 #' @return A named list of documented search parameters and values.
+#'
+#' @examples
+#' opts <- grant_search_options()
+#' opts$filters
+#' opts$sort_by
 #' @export
-grantsgov_search_options <- function() {
+grant_search_options <- function() {
   list(
     query_operator = c("AND", "OR"),
     format = c("json", "csv"),
@@ -113,8 +134,11 @@ grantsgov_search_options <- function() {
 #' List extract endpoint options
 #'
 #' @return A named list of documented extract parameters and values.
+#'
+#' @examples
+#' grant_extract_options()
 #' @export
-grantsgov_extract_options <- function() {
+grant_extract_options <- function() {
   list(
     filters = c("extract_type", "created_at"),
     extract_type = c("opportunities_json", "opportunities_csv"),
@@ -130,8 +154,11 @@ grantsgov_extract_options <- function() {
 #' error messages when present.
 #'
 #' @return A character vector of rate-limit header names.
+#'
+#' @examples
+#' grant_rate_limit_headers()
 #' @export
-grantsgov_rate_limit_headers <- function() {
+grant_rate_limit_headers <- function() {
   c(
     "retry-after",
     "x-ratelimit-limit",

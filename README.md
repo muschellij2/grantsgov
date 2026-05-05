@@ -36,11 +36,12 @@ pak::pak("muschellij2/grantsgov")
 ## Load the package
 
 ``` r
-if (requireNamespace("grantsgov", quietly = TRUE)) {
-  library(grantsgov)
-} else {
+if (file.exists("DESCRIPTION") && dir.exists("R")) {
   pkgload::load_all(quiet = TRUE)
+} else {
+  library(grantsgov)
 }
+#> Warning: package 'testthat' was built under R version 4.4.1
 ```
 
 ## Inspect endpoint metadata
@@ -49,18 +50,28 @@ These examples run without an API key because they only inspect local
 package metadata.
 
 ``` r
-grantsgov_base_url()
+grant_base_url()
 #> [1] "https://api.simpler.grants.gov"
-names(grantsgov_endpoints()$endpoints)
-#> [1] "search_opportunities" "get_opportunity"      "list_extracts"
-grantsgov_search_options()$sort_by
+names(grant_endpoints()$endpoints)
+#> [1] "search_opportunities" "get_opportunity"      "list_extracts"       
+#> [4] "health"
+grant_endpoints()$endpoints$health
+#> $method
+#> [1] "GET"
+#> 
+#> $path
+#> [1] "/health"
+#> 
+#> $function_name
+#> [1] "grant_health"
+grant_search_options()$sort_by
 #>  [1] "relevancy"             "opportunity_id"        "opportunity_number"   
 #>  [4] "opportunity_title"     "post_date"             "close_date"           
 #>  [7] "agency_code"           "agency_name"           "top_level_agency_name"
 #> [10] "award_floor"           "award_ceiling"
-grantsgov_extract_options()$extract_type
+grant_extract_options()$extract_type
 #> [1] "opportunities_json" "opportunities_csv"
-grantsgov_rate_limit_headers()
+grant_rate_limit_headers()
 #> [1] "retry-after"           "x-ratelimit-limit"     "x-ratelimit-remaining"
 #> [4] "x-ratelimit-reset"     "ratelimit-limit"       "ratelimit-remaining"  
 #> [7] "ratelimit-reset"
@@ -73,19 +84,19 @@ by the API.
 
 ``` r
 filters <- list(
-  opportunity_status = grantsgov_filter_one_of(c("posted", "forecasted")),
-  applicant_type = grantsgov_filter_one_of("nonprofits"),
-  close_date = grantsgov_filter_date_range(
+  opportunity_status = grant_filter_one_of(c("posted", "forecasted")),
+  applicant_type = grant_filter_one_of("nonprofits"),
+  close_date = grant_filter_date_range(
     start_date = Sys.Date(),
     end_date = Sys.Date() + 30
   ),
-  award_ceiling = grantsgov_filter_number_range(max = 1000000)
+  award_ceiling = grant_filter_number_range(max = 1000000)
 )
 
-pagination <- grantsgov_pagination(
+pagination <- grant_pagination(
   page_offset = 1,
-  page_size = 10,
-  sort_order = grantsgov_sort("close_date", "ascending")
+  page_size = 5000,
+  sort_order = grant_sort("close_date", "ascending")
 )
 
 str(filters)
@@ -104,7 +115,7 @@ pagination
 #> [1] 1
 #> 
 #> $page_size
-#> [1] 10
+#> [1] 5000
 #> 
 #> $sort_order
 #> $sort_order[[1]]
@@ -121,7 +132,7 @@ This chunk runs when `GRANTS_GOV_API_KEY` is set and
 `GRANTSGOV_README_LIVE=true`.
 
 ``` r
-results <- grantsgov_search_opportunities(
+results <- grant_search_opportunities(
   query = "education",
   filters = filters,
   pagination = pagination
@@ -133,13 +144,28 @@ length(results$data)
 To request CSV content instead of JSON:
 
 ``` r
-csv_text <- grantsgov_search_opportunities(
-  filters = list(opportunity_status = grantsgov_filter_one_of("posted")),
-  pagination = grantsgov_pagination(page_size = 100),
+csv_text <- grant_search_opportunities(
+  filters = list(opportunity_status = grant_filter_one_of("posted")),
+  pagination = grant_pagination(page_size = 100),
   format = "csv"
 )
 
 substr(csv_text, 1, 200)
+```
+
+To collect more than one page, use `grant_paginate()` or the
+endpoint-specific wrapper `grant_search_all_opportunities()`.
+
+``` r
+all_results <- grant_search_all_opportunities(
+  query = "education",
+  filters = filters,
+  page_size = 5000,
+  sort_order = grant_sort("close_date", "ascending")
+)
+
+length(all_results)
+attr(all_results, "pagination_info")
 ```
 
 ## Get opportunity details
@@ -147,34 +173,68 @@ substr(csv_text, 1, 200)
 This example needs a real opportunity UUID from the API.
 
 ``` r
-opportunity <- grantsgov_get_opportunity(
+opportunity <- grant_get_opportunity(
   "12345678-1234-1234-1234-123456789012"
 )
 ```
 
-## List and download extracts
+## List, download, and read extracts
 
 The metadata request runs when `GRANTS_GOV_API_KEY` is set and
-`GRANTSGOV_README_LIVE=true`. The download example is left unevaluated
-because it writes a file.
+`GRANTSGOV_README_LIVE=true`. Use the CSV extract type when you want to
+read the downloaded data into R.
 
 ``` r
-extracts <- grantsgov_list_extracts(
+extracts <- grant_list_extracts(
   filters = list(
-    extract_type = "opportunities_json",
-    created_at = grantsgov_filter_date_range(Sys.Date() - 30, Sys.Date())
+    extract_type = "opportunities_csv",
+    created_at = grant_filter_date_range(Sys.Date() - 30, Sys.Date())
   ),
-  pagination = grantsgov_pagination(
-    page_size = 10,
-    sort_order = grantsgov_sort("created_at")
+  pagination = grant_pagination(
+    page_size = 5000,
+    sort_order = grant_sort("created_at")
   )
 )
 
 length(extracts$data)
 ```
 
+`grant_download_extract()` defaults to a temporary `.csv` file. Pass
+`expected_file_size = extract$file_size_bytes` to verify the downloaded
+byte count against the API metadata.
+
 ``` r
-grantsgov_download_extract(extracts$data[[1]], "opportunities.json")
+extract_file <- grant_download_extract(
+  extracts$data[[1]],
+  expected_file_size = extracts$data[[1]]$file_size_bytes
+)
+
+extract_file
+```
+
+`grant_read_extract()` downloads a CSV extract, reads it with
+`readr::read_csv()`, warns if readr reports parsing problems, and stores
+the downloaded file path in `attr(data, "file")`.
+
+``` r
+extract_data <- grant_read_extract(
+  extracts$data[[1]],
+  expected_file_size = extracts$data[[1]]$file_size_bytes
+)
+
+attr(extract_data, "file")
+```
+
+Use `grant_list_all_extracts()` to automatically request each page of
+extract metadata.
+
+``` r
+all_extracts <- grant_list_all_extracts(
+  filters = list(extract_type = "opportunities_csv"),
+  page_size = 5000
+)
+
+length(all_extracts)
 ```
 
 ## Errors and rate limits
