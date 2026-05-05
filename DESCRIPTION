@@ -1,13 +1,27 @@
 Package: grantsgov
-Title: What the Package Does (One Line, Title Case)
+Title: Client for the Simpler Grants.gov API
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    c(person(given = "John", family = "Muschelli",
+             email = "johnmuschelli@gmail.com", role = c("aut", "cre")))
+Author: John Muschelli [aut, cre]
+Maintainer: John Muschelli <johnmuschelli@gmail.com>
+Description: Search opportunities, retrieve opportunity details, and list
+    bulk extract metadata from the Simpler Grants.gov API.
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 URL: https://github.com/muschellij2/grantsgov
 BugReports: https://github.com/muschellij2/grantsgov/issues
+Imports:
+    httr2
+Suggests: 
+    covr,
+    mockery,
+    roxygen2,
+    spelling,
+    withr,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Language: en-US
