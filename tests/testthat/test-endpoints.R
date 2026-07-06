@@ -134,7 +134,7 @@ test_that("get opportunity adds the ID to the request path and parses JSON", {
 
   expect_equal(out$data$opportunity_id, "abc def")
   expect_equal(captured$method, "GET")
-  expect_equal(httr2::url_parse(captured$url)$path, "/v1/opportunities/abc def")
+  expect_equal(captured$url, "https://example.test/v1/opportunities/abc%20def")
   expect_error(grant_get_opportunity("", api_key = "key"), "opportunity_id")
 })
 
