@@ -332,8 +332,8 @@ str(education_filters)
 #>   .. ..$ : chr "posted"
 #>   .. ..$ : chr "forecasted"
 #>  $ close_date        :List of 2
-#>   ..$ start_date: chr "2026-05-05"
-#>   ..$ end_date  : chr "2026-08-03"
+#>   ..$ start_date: chr "2026-07-06"
+#>   ..$ end_date  : chr "2026-10-04"
 #>  $ award_ceiling     :List of 2
 #>   ..$ min: num 50000
 #>   ..$ max: num 2e+06
@@ -537,10 +537,10 @@ extract_filters
 #> 
 #> $created_at
 #> $created_at$start_date
-#> [1] "2026-04-05"
+#> [1] "2026-06-06"
 #> 
 #> $created_at$end_date
-#> [1] "2026-05-05"
+#> [1] "2026-07-06"
 extract_pagination
 #> $page_offset
 #> [1] 1

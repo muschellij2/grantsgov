@@ -31,6 +31,6 @@ grant_filter_date_range("2026-01-01", "2026-12-31")
 #> 
 grant_filter_date_range(end_date = Sys.Date() + 30)
 #> $end_date
-#> [1] "2026-06-04"
+#> [1] "2026-08-05"
 #> 
 ```
