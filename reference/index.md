@@ -103,6 +103,9 @@
 - [`grant_search_all_opportunities()`](grant_search_all_opportunities.md)
   : Paginate through opportunity search results
 
+- [`grant_search_hits_to_df()`](grant_search_hits_to_df.md) : Convert
+  opportunity search hits to a data frame
+
 - [`grant_search_opportunities()`](grant_search_opportunities.md) :
   Search grant opportunities
 
