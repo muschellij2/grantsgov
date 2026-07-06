@@ -22,14 +22,14 @@ or a scalar URL.}
 
 \item{expected_file_size}{Optional expected downloaded file size in bytes.}
 
-\item{...}{Additional arguments passed to \code{\link[readr:read_delim]{readr::read_csv()}}.}
+\item{...}{Additional arguments passed to \code{\link[readr:read_csv]{readr::read_csv()}}.}
 }
 \value{
 A tibble with the downloaded file path in \code{attr(x, "file")}.
 }
 \description{
 Downloads an extract with \code{\link[=grant_download_extract]{grant_download_extract()}} and reads it with
-\code{\link[readr:read_delim]{readr::read_csv()}}. If readr reports parsing problems, this function emits a
+\code{\link[readr:read_csv]{readr::read_csv()}}. If readr reports parsing problems, this function emits a
 warning. The downloaded file path is stored in the returned data frame's
 \code{file} attribute.
 }

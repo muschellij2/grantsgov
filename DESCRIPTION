@@ -11,7 +11,6 @@ Description: Search opportunities, retrieve opportunity details, and list
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 URL: https://github.com/muschellij2/grantsgov
 BugReports: https://github.com/muschellij2/grantsgov/issues
 Imports:
@@ -30,3 +29,4 @@ Suggests:
 Config/testthat/edition: 3
 Language: en-US
 VignetteBuilder: knitr
+Config/roxygen2/version: 8.0.0

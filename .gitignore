@@ -8,3 +8,4 @@ grantsgov.Rcheck
 grantsgov.*.tar.gz
 grantsgov*.tar.gz
 docs
+.positai

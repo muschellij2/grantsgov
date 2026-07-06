@@ -402,6 +402,123 @@ grant_search_all_opportunities <- function(query = NULL,
   )
 }
 
+#' Convert opportunity search hits to a data frame
+#'
+#' Flattens the list returned by [grant_search_all_opportunities()] or the
+#' `data` field returned by [grant_search_opportunities()] into a tabular form.
+#' This is useful when you want a quick data-frame representation of search
+#' results before fetching full opportunity detail records.
+#'
+#' @param search_hits A list of opportunity search-hit records.
+#'
+#' @return A data frame with one row per search hit.
+#'
+#' @examples
+#' hits <- list(
+#'   list(
+#'     opportunity_id = "opp-1",
+#'     legacy_opportunity_id = 123,
+#'     opportunity_number = "PAR-00-001",
+#'     opportunity_title = "Example opportunity",
+#'     opportunity_status = "posted",
+#'     agency = "HHS-NIH11",
+#'     agency_code = "HHS-NIH11",
+#'     agency_name = "National Institutes of Health",
+#'     top_level_agency_code = "HHS",
+#'     top_level_agency_name = "Department of Health and Human Services",
+#'     category = "discretionary",
+#'     category_explanation = NULL,
+#'     opportunity_assistance_listings = list(
+#'       list(number = "93.000", title = "Example listing")
+#'     ),
+#'     summary = list(
+#'       post_date = "2026-01-01",
+#'       close_date = "2026-02-01",
+#'       archive_date = "2026-03-01",
+#'       created_at = "2026-01-01T12:00:00+00:00",
+#'       updated_at = "2026-01-02T12:00:00+00:00",
+#'       additional_info_url = "https://example.test",
+#'       agency_email_address = "info@example.test",
+#'       award_floor = 1000,
+#'       award_ceiling = 2000,
+#'       estimated_total_program_funding = 3000,
+#'       expected_number_of_awards = 4,
+#'       is_cost_sharing = FALSE,
+#'       is_forecast = FALSE,
+#'       applicant_types = list("state_governments"),
+#'       funding_categories = list("health"),
+#'       funding_instruments = list("grant"),
+#'       summary_description = "Longer summary",
+#'       applicant_eligibility_description = "Eligibility text",
+#'       agency_contact_description = "Contact text"
+#'     )
+#'   )
+#' )
+#' grant_search_hits_to_df(hits)
+#' @export
+grant_search_hits_to_df <- function(search_hits) {
+  if (!is.list(search_hits)) {
+    stop("`search_hits` must be a list of opportunity search-hit records.", call. = FALSE)
+  }
+
+  if (!length(search_hits)) {
+    return(data.frame(stringsAsFactors = FALSE))
+  }
+
+  do.call(
+    rbind,
+    lapply(search_hits, function(x) {
+      s <- x$summary %||% list()
+      listings <- x$opportunity_assistance_listings %||% list()
+
+      data.frame(
+        opportunity_id = x$opportunity_id %||% NA_character_,
+        legacy_opportunity_id = x$legacy_opportunity_id %||% NA_integer_,
+        opportunity_number = x$opportunity_number %||% NA_character_,
+        opportunity_title = x$opportunity_title %||% NA_character_,
+        opportunity_status = x$opportunity_status %||% NA_character_,
+        agency = x$agency %||% NA_character_,
+        agency_code = x$agency_code %||% NA_character_,
+        agency_name = x$agency_name %||% NA_character_,
+        top_level_agency_code = x$top_level_agency_code %||% NA_character_,
+        top_level_agency_name = x$top_level_agency_name %||% NA_character_,
+        category = x$category %||% NA_character_,
+        category_explanation = x$category_explanation %||% NA_character_,
+        post_date = grant_helper_as_date_or_na(s$post_date),
+        close_date = grant_helper_as_date_or_na(s$close_date),
+        archive_date = grant_helper_as_date_or_na(s$archive_date),
+        created_at = grant_helper_as_datetime_or_na(s$created_at),
+        updated_at = grant_helper_as_datetime_or_na(s$updated_at),
+        additional_info_url = s$additional_info_url %||% NA_character_,
+        agency_email_address = s$agency_email_address %||% NA_character_,
+        award_floor = s$award_floor %||% NA_real_,
+        award_ceiling = s$award_ceiling %||% NA_real_,
+        estimated_total_program_funding = s$estimated_total_program_funding %||% NA_real_,
+        expected_number_of_awards = s$expected_number_of_awards %||% NA_integer_,
+        is_cost_sharing = s$is_cost_sharing %||% NA,
+        is_forecast = s$is_forecast %||% NA,
+        applicant_types = grant_helper_collapse_chr(s$applicant_types),
+        funding_categories = grant_helper_collapse_chr(s$funding_categories),
+        funding_instruments = grant_helper_collapse_chr(s$funding_instruments),
+        assistance_listing_numbers = grant_helper_collapse_chr(vapply(
+          listings,
+          function(y) y$number %||% NA_character_,
+          character(1)
+        )),
+        assistance_listing_program_titles = grant_helper_collapse_chr(vapply(
+          listings,
+          function(y) y$title %||% NA_character_,
+          character(1)
+        )),
+        summary_description = s$summary_description %||% NA_character_,
+        applicant_eligibility_description = s$applicant_eligibility_description %||% NA_character_,
+        agency_contact_description = s$agency_contact_description %||% NA_character_,
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+}
+
 #' Get recently posted opportunities
 #'
 #' Convenience wrapper for getting all opportunities posted in the last day or
@@ -527,6 +644,30 @@ grant_filter_number_range <- function(min = NULL, max = NULL) {
   }
 
   grant_compact_list(list(min = min, max = max))
+}
+
+grant_helper_collapse_chr <- function(x) {
+  if (is.null(x) || !length(x)) {
+    return(NA_character_)
+  }
+
+  paste(unlist(x, use.names = FALSE), collapse = "; ")
+}
+
+grant_helper_as_date_or_na <- function(x) {
+  if (is.null(x) || !length(x) || !nzchar(x)) {
+    return(as.Date(NA))
+  }
+
+  as.Date(substr(x, 1, 10))
+}
+
+grant_helper_as_datetime_or_na <- function(x) {
+  if (is.null(x) || !length(x) || !nzchar(x)) {
+    return(as.POSIXct(NA))
+  }
+
+  as.POSIXct(x, tz = "UTC")
 }
 
 # Normalize one sort object or a list of sort objects into an API array.

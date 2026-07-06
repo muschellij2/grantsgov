@@ -36,6 +36,65 @@ test_that("sort, pagination, and filters build request-body fragments", {
   expect_error(grant_filter_number_range(max = c(1, 2)), "max")
 })
 
+test_that("search hits can be flattened to a data frame", {
+  hits <- list(
+    list(
+      opportunity_id = "opp-1",
+      legacy_opportunity_id = 123L,
+      opportunity_number = "PAR-00-001",
+      opportunity_title = "Example opportunity",
+      opportunity_status = "posted",
+      agency = "HHS-NIH11",
+      agency_code = "HHS-NIH11",
+      agency_name = "National Institutes of Health",
+      top_level_agency_code = "HHS",
+      top_level_agency_name = "Department of Health and Human Services",
+      category = "discretionary",
+      category_explanation = NULL,
+      opportunity_assistance_listings = list(
+        list(number = "93.000", title = "Example listing")
+      ),
+      summary = list(
+        post_date = "2026-01-01",
+        close_date = "2026-02-01",
+        archive_date = "2026-03-01",
+        created_at = "2026-01-01T12:00:00+00:00",
+        updated_at = "2026-01-02T12:00:00+00:00",
+        additional_info_url = "https://example.test",
+        agency_email_address = "info@example.test",
+        award_floor = 1000,
+        award_ceiling = 2000,
+        estimated_total_program_funding = 3000,
+        expected_number_of_awards = 4,
+        is_cost_sharing = FALSE,
+        is_forecast = FALSE,
+        applicant_types = list("state_governments"),
+        funding_categories = list("health"),
+        funding_instruments = list("grant"),
+        summary_description = "Longer summary",
+        applicant_eligibility_description = "Eligibility text",
+        agency_contact_description = "Contact text"
+      )
+    )
+  )
+
+  out <- grant_search_hits_to_df(hits)
+
+  expect_s3_class(out, "data.frame")
+  expect_equal(nrow(out), 1)
+  expect_equal(out$opportunity_id, "opp-1")
+  expect_equal(out$post_date, as.Date("2026-01-01"))
+  expect_equal(out$agency_name, "National Institutes of Health")
+  expect_equal(out$funding_instruments, "grant")
+  expect_equal(out$assistance_listing_numbers, "93.000")
+  expect_equal(out$summary_description, "Longer summary")
+})
+
+test_that("search hit flattening validates and handles empty input", {
+  expect_error(grant_search_hits_to_df("not-a-list"), "search-hit records")
+  expect_equal(nrow(grant_search_hits_to_df(list())), 0)
+})
+
 test_that("generic paginator combines pages using API pagination metadata", {
   calls <- list()
   endpoint <- function(pagination) {
